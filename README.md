@@ -54,7 +54,6 @@ conda activate clean
 
 pip install fair-esm==2.0.0 --no-deps
 
-
 ```
 
 Pytorch installation is different for different Operating systems, please refer [Pytorch Installation](https://pytorch.org/get-started/locally/).
