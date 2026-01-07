@@ -1,0 +1,29 @@
+name: clean-cpu
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10.4
+
+  # PyTorch CPU-only (conda install pytorch==1.11.0 cpuonly -c pytorch)
+  - pytorch=1.11.0
+  - cpuonly
+
+  # Fix iJIT_NotifyEvent issues
+  - mkl=2024.0.*
+  - intel-openmp<2025
+
+  # ITT API
+  - ittapi
+
+  - matplotlib=3.7.0
+  - numpy=1.22.3
+  - pandas=1.4.2
+  - scikit-learn=1.2.0
+  - scipy=1.7.3
+  - tqdm=4.64.0
+
+  - pip
+
