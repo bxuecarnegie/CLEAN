@@ -1,5 +1,5 @@
 # CLEAN: Enzyme Function Prediction using Contrastive Learning
-
+# ***THIS IS A FORK WITH ENVIRONMENTAL FIX FOR CERTAIN SET UPS***
   
 
 [![DOI](https://zenodo.org/badge/525112894.svg)](https://zenodo.org/badge/latestdoi/525112894)
@@ -121,7 +121,6 @@ Install requirement and build CLEAN
 
 ```python
 
-pip install -r requirements.txt
 git clone https://github.com/facebookresearch/esm.git
 python build.py install
 
