@@ -50,7 +50,7 @@ Manuscript result was obtained using Python 3.10.4; PyTorch 1.11.0; CUDA 11.3; f
 cd CLEAN/app/
 conda config --set channel_priority strict
 conda env create -f environment-gpu.yml
-conda activate clean
+conda activate clean-gpu
 
 pip install fair-esm==2.0.0 --no-deps
 
