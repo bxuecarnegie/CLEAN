@@ -29,7 +29,8 @@ def mine_hard_negative(dist_map, knn=10):
     return negative
 
 
-def mine_negative(anchor, id_ec, ec_id, mine_neg):
+# Original function
+def _mine_negative(anchor, id_ec, ec_id, mine_neg):
     anchor_ec = id_ec[anchor]
     pos_ec = random.choice(anchor_ec)
     neg_ec = mine_neg[pos_ec]['negative']
@@ -39,6 +40,27 @@ def mine_negative(anchor, id_ec, ec_id, mine_neg):
         result_ec = random.choices(neg_ec, weights=weights, k=1)[0]
     neg_id = random.choice(ec_id[result_ec])
     return neg_id
+
+# Added fallback to avoid long/infinite loops in dataloader
+def mine_negative(anchor, id_ec, ec_id, mine_neg):
+    anchor_ec = set(id_ec[anchor])
+    pos_ec = random.choice(list(anchor_ec))
+
+    candidates = mine_neg[pos_ec]['negative']
+    weights = mine_neg[pos_ec]['weights']
+
+    valid = [(ec, w) for ec, w in zip(candidates, weights) if ec not in anchor_ec]
+
+    if valid:
+        neg_ecs, valid_weights = zip(*valid)
+        result_ec = random.choices(neg_ecs, weights=valid_weights, k=1)[0]
+    else:
+        fallback = [ec for ec in ec_id.keys() if ec not in anchor_ec and '-' not in ec]
+        if not fallback:
+            raise RuntimeError(f"No negative EC available for anchor={anchor}")
+        result_ec = random.choice(fallback)
+
+    return random.choice(ec_id[result_ec])
 
 
 def random_positive(id, id_ec, ec_id):
@@ -68,8 +90,10 @@ class Triplet_dataset_with_mine_EC(torch.utils.data.Dataset):
     def __getitem__(self, index):
         anchor_ec = self.full_list[index]
         anchor = random.choice(self.ec_id[anchor_ec])
+
         pos = random_positive(anchor, self.id_ec, self.ec_id)
         neg = mine_negative(anchor, self.id_ec, self.ec_id, self.mine_neg)
+
         a = torch.load('./data/esm_data/' + anchor + '.pt')
         p = torch.load('./data/esm_data/' + pos + '.pt')
         n = torch.load('./data/esm_data/' + neg + '.pt')

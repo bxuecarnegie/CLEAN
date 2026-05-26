@@ -1,5 +1,5 @@
 # CLEAN: Enzyme Function Prediction using Contrastive Learning
-# ***THIS IS A FORK WITH ENVIRONMENTAL FIX FOR CERTAIN SET UPS***
+# ***THIS IS A FORK WITH FIXES FOR CERTAIN SET UPS***
   
 
 [![DOI](https://zenodo.org/badge/525112894.svg)](https://zenodo.org/badge/latestdoi/525112894)
@@ -42,17 +42,17 @@ Manuscript result was obtained using Python 3.10.4; PyTorch 1.11.0; CUDA 11.3; f
 
   
 
-### 1.2 Quickstart (GPU)
+### 1.2 Quickstart (Blackwell)
 
 
 ```
 
 cd CLEAN/app/
-conda config --set channel_priority strict
-conda env create -f environment-gpu.yml
-conda activate clean-gpu
+conda create -n clean python==3.10.4 -y
+conda activate clean
+pip install -r requirements.txt 
+conda install pytorch=2.10.0 cuda-toolkit=12 -c conda-forge
 
-pip install fair-esm==2.0.0 --no-deps
 
 ```
 
