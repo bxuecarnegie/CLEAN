@@ -5,6 +5,7 @@ from .distance_map import *
 from .evaluate import *
 from .dataloader import *
 import pandas as pd
+import random
 import warnings
 
 def get_cluster_cen(model_emb_train, model_emb_test,
@@ -20,6 +21,72 @@ def get_cluster_cen(model_emb_train, model_emb_test,
     cluster_center_model = get_cluster_center(
         model_emb_train, ec_id_dict_train)
     return cluster_center_model
+
+
+def collect_valid_negatives(
+    max_ec,
+    ec_id_dict_train,
+    id_ec_train,
+    negative,
+    neg_target,
+    allow_global_fallback=True,
+):
+    """
+    Collect valid negative proteins for one EC during GMM.
+
+    Returns:
+      neg_dict: dict[str, list[str]]
+          protein_id -> EC labels
+      neg_source: str
+          one of {"hard", "global", "none"}
+    """
+    neg_target = int(neg_target)
+    neg_dict = {}
+
+    # Hard negative ECs
+    hard_negative_ids = []
+
+    if negative is not None and max_ec in negative:
+        for neg_ec in negative[max_ec].get("negative", []):
+            if neg_ec not in ec_id_dict_train:
+                continue
+
+            for protein_id in ec_id_dict_train[neg_ec]:
+                if max_ec not in id_ec_train[protein_id]:
+                    hard_negative_ids.append(protein_id)
+
+    hard_negative_ids = list(set(hard_negative_ids))
+
+    if len(hard_negative_ids) > 0:
+        sample_size = min(neg_target, len(hard_negative_ids))
+        sampled_ids = random.sample(hard_negative_ids, k=sample_size)
+
+        for protein_id in sampled_ids:
+            neg_dict[protein_id] = id_ec_train[protein_id]
+
+        return neg_dict, "hard"
+
+    # Global negative ECs fallback
+    if allow_global_fallback:
+        global_negative_ids = [
+            protein_id
+            for protein_id, ecs in id_ec_train.items()
+            if max_ec not in ecs
+        ]
+
+        global_negative_ids = list(set(global_negative_ids))
+
+        if len(global_negative_ids) > 0:
+            sample_size = min(neg_target, len(global_negative_ids))
+            sampled_ids = random.sample(global_negative_ids, k=sample_size)
+
+            for protein_id in sampled_ids:
+                neg_dict[protein_id] = id_ec_train[protein_id]
+
+            return neg_dict, "global"
+
+    return {}, "none"
+
 
 def get_dist(max_ec, train_data, report_metrics = False, 
                  pretrained=True, model_name=None, target = 300, neg_target = 2000, negative = None):
@@ -60,32 +127,57 @@ def get_dist(max_ec, train_data, report_metrics = False,
         #if len(id_ec_train[ids]) == 1:
         id_ec_test[ids] = max_ec
     
-    import random
-    
-    neg_dict = {}
-    counter = 0
-    while len(list(neg_dict.keys())) <= neg_target:
-        counter += 1
-        cur = random.choices(negative[max_ec]['negative'], weights= negative[max_ec]['weights'])[0]
-        cur = random.choice(list(ec_id_dict_train[cur]))
-        if max_ec not in id_ec_train[cur]:
-            neg_dict[cur] = id_ec_train[cur]
-        if counter >= 10000:
-            break
-    
+    # Precompute valid negatives
+    neg_dict, neg_source = collect_valid_negatives(
+        max_ec=max_ec,
+        ec_id_dict_train=ec_id_dict_train,
+        id_ec_train=id_ec_train,
+        negative=negative,
+        neg_target=neg_target,
+        allow_global_fallback=True,
+    )
+
+    if neg_source == "global":
+        print(
+            f"[WARN] {max_ec}: no valid hard negatives found; "
+            f"using {len(neg_dict)} global negatives instead."
+        )
+    elif neg_source == "none":
+        print(
+            f"[WARN] {max_ec}: no valid negatives found; "
+            f"skipping negative-distance calculation for this EC."
+        )
+    else:
+        print(f"[INFO] {max_ec}: using {len(neg_dict)} hard negatives.")
+
     emb_test = model_embedding_test(id_ec_test, model, device, dtype)
-    ec_centers = get_cluster_cen(emb_train, emb_test, ec_id_dict_train, id_ec_test, device, dtype)
-    
-    neg_emb_test = model_embedding_test(neg_dict, model, device, dtype)
-    
+    ec_centers = get_cluster_cen(
+        emb_train,
+        emb_test,
+        ec_id_dict_train,
+        id_ec_test,
+        device,
+        dtype
+    )
+
     distances = []
     for i in range(len(emb_test)):
-        dist = (emb_test[i] - ec_centers[max_ec].to(device)).norm(dim = 0, p = 2).detach().cpu().numpy().item()
+        dist = (
+            emb_test[i] - ec_centers[max_ec].to(device)
+        ).norm(dim=0, p=2).detach().cpu().numpy().item()
         distances.append(dist)
-        
+
     neg_distances = []
-    for i in range(len(neg_emb_test)):
-        dist = (neg_emb_test[i] - ec_centers[max_ec].to(device)).norm(dim = 0, p = 2).detach().cpu().numpy().item()
-        neg_distances.append(dist)
-        
+
+    if len(neg_dict) > 0:
+        neg_emb_test = model_embedding_test(neg_dict, model, device, dtype)
+
+        for i in range(len(neg_emb_test)):
+            dist = (
+                neg_emb_test[i] - ec_centers[max_ec].to(device)
+            ).norm(dim=0, p=2).detach().cpu().numpy().item()
+            neg_distances.append(dist)
+    else:
+        print(f"[WARN] {max_ec}: returning empty neg_distances.")
+
     return distances, neg_distances

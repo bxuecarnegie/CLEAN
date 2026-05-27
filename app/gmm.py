@@ -12,13 +12,17 @@ import numpy as np
 import pickle
 import random
 
-train_data = "split100"
+train_data = "rpsd.ef.v2025.1.enzymes"
+dist_map_pkl = "./data/distance_map/rpsd.ef.v2025.1.enzymes.pkl"
+gmm_test_folder = './gmm_test'
+
+ensure_dirs(gmm_test_folder)
 
 id_ec_train, ec_id_dict_train = get_ec_id_dict('./data/' + train_data + '.csv')
 
 counter = 0
 
-dist_map = pickle.load(open('./data/distance_map/split100.pkl', 'rb'))
+dist_map = pickle.load(open(dist_map_pkl, 'rb'))
 negative = mine_hard_negative(dist_map, 5)
 
 for i in range(40):
@@ -29,13 +33,19 @@ for i in range(40):
 
     for ec in random.choices(list(ec_id_dict_train.keys()), k = 500):
 
-        distances, neg_distances = get_dist(ec, train_data,
-                report_metrics=True, pretrained=True, neg_target = 100, negative = negative)
+        distances, neg_distances = get_dist(ec, train_data, model_name=train_data + '_triplet',
+                report_metrics=True, pretrained=False, neg_target = 100, negative = negative)
+        if len(neg_distances) == 0:
+            print(
+                f"[WARN] {ec}: no negative distances available; "
+                f"skipping GMM fitting for this EC."
+            )
+            continue
         all_distance.extend(neg_distances)
         all_distance.extend(distances)
         
         if counter % 100 == 0:
-            print(counter)
+            print(i, counter)
             
         counter += 1
         
@@ -43,7 +53,7 @@ for i in range(40):
     main_GMM = mixture.GaussianMixture(n_components=2, covariance_type='full',max_iter=1000,n_init=30,tol=1e-4)
     main_GMM.fit(dist)
 
-    pickle.dump(main_GMM, open('./gmm_test/GMM_100_500_' + str(i) + '.pkl', 'wb'))
+    pickle.dump(main_GMM, open(gmm_test_folder + '/GMM_100_500_' + str(i) + '.pkl', 'wb'))
 
     plt.hist(all_distance, bins = 500, alpha = 0.05)
-    plt.savefig('./gmm_test/GMM_100_500_' + str(i) + '.png')
+    plt.savefig(gmm_test_folder + '/GMM_100_500_' + str(i) + '.png')

@@ -29,38 +29,61 @@ def mine_hard_negative(dist_map, knn=10):
     return negative
 
 
-# Original function
-def _mine_negative(anchor, id_ec, ec_id, mine_neg):
-    anchor_ec = id_ec[anchor]
-    pos_ec = random.choice(anchor_ec)
-    neg_ec = mine_neg[pos_ec]['negative']
-    weights = mine_neg[pos_ec]['weights']
-    result_ec = random.choices(neg_ec, weights=weights, k=1)[0]
-    while result_ec in anchor_ec:
-        result_ec = random.choices(neg_ec, weights=weights, k=1)[0]
-    neg_id = random.choice(ec_id[result_ec])
-    return neg_id
-
 # Added fallback to avoid long/infinite loops in dataloader
 def mine_negative(anchor, id_ec, ec_id, mine_neg):
     anchor_ec = set(id_ec[anchor])
     pos_ec = random.choice(list(anchor_ec))
 
-    candidates = mine_neg[pos_ec]['negative']
+    neg_ec = mine_neg[pos_ec]['negative']
     weights = mine_neg[pos_ec]['weights']
 
-    valid = [(ec, w) for ec, w in zip(candidates, weights) if ec not in anchor_ec]
+    valid = [(ec, w) for ec, w in zip(neg_ec, weights) if ec not in anchor_ec]
 
     if valid:
         neg_ecs, valid_weights = zip(*valid)
         result_ec = random.choices(neg_ecs, weights=valid_weights, k=1)[0]
     else:
-        fallback = [ec for ec in ec_id.keys() if ec not in anchor_ec and '-' not in ec]
+        fallback = [ec for ec in ec_id.keys() if ec not in anchor_ec and '-' not in ec and len(ec_id[ec]) > 0]
         if not fallback:
             raise RuntimeError(f"No negative EC available for anchor={anchor}")
         result_ec = random.choice(fallback)
 
     return random.choice(ec_id[result_ec])
+
+
+def mine_negative(anchor, id_ec, ec_id, mine_neg):
+    anchor_ec = id_ec[anchor]
+    pos_ec = random.choice(anchor_ec)
+
+    neg_ecs = mine_neg[pos_ec]["negative"]
+    weights = mine_neg[pos_ec]["weights"]
+
+    valid_ecs = []
+    valid_weights = []
+
+    for ec, weight in zip(neg_ecs, weights):
+        if ec not in anchor_ec:
+            valid_ecs.append(ec)
+            valid_weights.append(weight)
+
+    if len(valid_ecs) > 0:
+        result_ec = random.choices(valid_ecs, weights=valid_weights, k=1)[0]
+        return random.choice(list(ec_id[result_ec]))
+
+    # Fallback only for the problematic edge case.
+    fallback_ecs = [
+        ec for ec in ec_id.keys()
+        if ec not in anchor_ec and "-" not in ec and len(ec_id[ec]) > 0
+    ]
+
+    if len(fallback_ecs) == 0:
+        raise RuntimeError(
+            f"No valid negative exists for anchor={anchor}, "
+            f"anchor_ec={anchor_ec}, pos_ec={pos_ec}"
+        )
+
+    result_ec = random.choice(fallback_ecs)
+    return random.choice(list(ec_id[result_ec]))
 
 
 def random_positive(id, id_ec, ec_id):
