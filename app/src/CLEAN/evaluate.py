@@ -11,20 +11,46 @@ import numpy as np
 
 
 def maximum_separation(dist_lst, first_grad, use_max_grad):
+    dist_lst = np.asarray(dist_lst, dtype=float)
+
+    # Need at least two distances.
+    if len(dist_lst) < 2:
+        return 0
+
+    # Ignore NaN/inf values.
+    dist_lst = dist_lst[np.isfinite(dist_lst)]
+
+    if len(dist_lst) < 2:
+        return 0
+
+    # If all top distances are identical or nearly identical,
+    # there is no meaningful separation.
+    if np.allclose(dist_lst, dist_lst[0]):
+        return 0
+
     opt = 0 if first_grad else -1
+
     gamma = np.append(dist_lst[1:], np.repeat(dist_lst[-1], 10))
     sep_lst = np.abs(dist_lst - np.mean(gamma))
-    sep_grad = np.abs(sep_lst[:-1]-sep_lst[1:])
+    sep_grad = np.abs(sep_lst[:-1] - sep_lst[1:])
+
+    if len(sep_grad) == 0 or np.allclose(sep_grad, sep_grad[0]):
+        return 0
+
     if use_max_grad:
         # max separation index determined by largest grad
-        max_sep_i = np.argmax(sep_grad)
+        max_sep_i = int(np.argmax(sep_grad))
     else:
-        # max separation index determined by first or the last grad
-        large_grads = np.where(sep_grad > np.mean(sep_grad))
-        max_sep_i = large_grads[-1][opt]
-    # if no large grad is found, just call first EC
+         # max separation index determined by first or the last grad
+        large_grads = np.where(sep_grad > np.mean(sep_grad))[0]
+        if len(large_grads) == 0:
+            return 0
+        max_sep_i = int(large_grads[opt])
+
+    # if cutoff is too deep, only call the first EC.
     if max_sep_i >= 5:
         max_sep_i = 0
+
     return max_sep_i
 
 
