@@ -463,8 +463,17 @@ Also notice that the outputing embedding for `SupCon-Hard` is `out_dim=256` whil
 
 To train an ensumlbe of GMM:
 
-```python
+```
 
 python gmm.py
+
+```
+You will need to concatenate all "GMM_100_500_x.pkl" in to a list and dump as a pickle file.
+```
+gmm_ensemble = []
+for i in range(40):
+  pickle.load(gmm_i, open('./gmm_test/GMM_100_500_' + str(i) + '.pkl', 'rb'))
+  gmm.ensemble.append(gmmi)
+pickle.dump(gmm_ensemble, open('./gmm_test/GMM_100_500_ensemble.pkl', 'wb'))
 
 ```
